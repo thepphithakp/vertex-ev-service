@@ -1,0 +1,30 @@
+{{- if .Values.httpRoute.enabled }}
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: {{ include "ev-service.fullname" . }}
+  labels:
+    {{- include "ev-service.labels" . | nindent 4 }}
+spec:
+  parentRefs:
+    - name: {{ .Values.httpRoute.parentRef.name }}
+      {{- with .Values.httpRoute.parentRef.namespace }}
+      namespace: {{ . }}
+      {{- end }}
+      {{- with .Values.httpRoute.parentRef.sectionName }}
+      sectionName: {{ . }}
+      {{- end }}
+  {{- if not .Values.httpRoute.hostnames }}
+  {{- fail "ต้องส่ง httpRoute.hostnames ตอน deploy — ค่าจริงไม่เก็บใน repo ที่เป็น public" }}
+  {{- end }}
+  hostnames:
+    {{- toYaml .Values.httpRoute.hostnames | nindent 4 }}
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /api/v1/ev
+      backendRefs:
+        - name: {{ include "ev-service.fullname" $ }}
+          port: {{ $.Values.service.port }}
+{{- end }}

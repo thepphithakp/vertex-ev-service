@@ -1,0 +1,121 @@
+replicaCount: 1
+
+image:
+  repository: ghcr.io/thepphithakp/vertex-ev-service
+  pullPolicy: IfNotPresent
+  tag: ""
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  create: false
+  name: ""
+
+podAnnotations: {}
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 65532
+  fsGroup: 65532
+
+securityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop: [ALL]
+  readOnlyRootFilesystem: true
+
+service:
+  type: ClusterIP
+  port: 4004
+
+httpRoute:
+  enabled: true
+  parentRef:
+    name: vertex-gateway
+    namespace: ""
+    sectionName: http
+  # ⚠️ ห้ามใส่ค่าจริงลงไฟล์นี้ — repo เป็น public
+  #    ส่งตอน deploy: --set httpRoute.hostnames[0]="${{ secrets.PUBLIC_HOST }}"
+  hostnames: []
+
+resources:
+  limits:
+    cpu: 200m
+    memory: 128Mi
+  requests:
+    cpu: 10m
+    memory: 32Mi
+
+nodeSelector: {}
+tolerations: []
+affinity: {}
+
+# --- Lifecycle ---
+#
+# ⚠️ SHUTDOWN_DRAIN_DELAY + SHUTDOWN_TIMEOUT (5+20 = 25s)
+#    < terminationGracePeriodSeconds (45s) ไม่งั้นโดน SIGKILL ก่อนปิดเสร็จ
+#    — รวม worker loop ด้วย (main.go หยุด worker ก่อนปิด HTTP server)
+terminationGracePeriodSeconds: 45
+
+livenessProbe:
+  httpGet:
+    path: /livez
+    port: http
+  periodSeconds: 15
+  timeoutSeconds: 3
+  failureThreshold: 3
+
+readinessProbe:
+  httpGet:
+    path: /readyz
+    port: http
+  periodSeconds: 5
+  timeoutSeconds: 3
+  failureThreshold: 2
+
+startupProbe:
+  httpGet:
+    path: /livez
+    port: http
+  periodSeconds: 2
+  failureThreshold: 30
+
+shutdown:
+  drainDelay: 5s
+  timeout: 20s
+
+# --- Database ---
+#
+# ev_app ทำได้แค่ DML ใน schema ev เท่านั้น
+# (ดู vertex-migrations/ev/bootstrap/000_create_roles.sql)
+db:
+  host: postgres
+  port: "5432"
+  name: vertex
+  sslMode: disable
+  searchPath: ev
+  credentialsSecret: ev-db-app
+
+jwt:
+  publicKeysSecret: jwt-public-keys
+  issuer: ""
+  audience: ""
+
+# --- Notification ---
+#
+# worker เรียก notification-service ผ่าน cluster-internal DNS — ไม่ผ่าน gateway
+# tokenSecret ต้องชี้ไป Secret เดียวกับที่ notification-service ถือ (push-service-token)
+notification:
+  serviceURL: http://notification-service:4003
+  tokenSecret: push-service-token
+
+env: {}
+
+serviceMonitor:
+  enabled: true
+  interval: 30s
+  scrapeTimeout: 10s
+  additionalLabels:
+    release: prometheus-grafana
