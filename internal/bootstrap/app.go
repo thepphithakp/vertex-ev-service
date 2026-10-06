@@ -1,6 +1,7 @@
 package bootstrap
 
 import (
+	"github.com/gofiber/contrib/websocket"
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/gofiber/fiber/v2/middleware/recover"
@@ -47,6 +48,22 @@ func NewApp(db *gorm.DB, cfg config.Config, auth middleware.AuthConfig) (*fiber.
 	h := handler.NewParkingHandler(svc)
 
 	h.RegisterRoutes(app.Group("/api/v1/ev/parking", middleware.NewAuth(auth)))
+
+	// 🧪 PROTOTYPE ชั่วคราว — ทดสอบว่า WebSocket upgrade รอดจาก
+	// PWA -> Cloudflare Worker -> Cloudflare Tunnel -> Envoy Gateway -> pod นี้ไหม
+	// ก่อนออกแบบระบบ chat/call จริง (ดู figure-it-out Phase B)
+	// ลบทิ้งหลังพิสูจน์ผลแล้ว ไม่ใช่โค้ด production
+	app.Get("/api/v1/ev/ws-echo-test", websocket.New(func(c *websocket.Conn) {
+		for {
+			mt, msg, err := c.ReadMessage()
+			if err != nil {
+				return
+			}
+			if err := c.WriteMessage(mt, msg); err != nil {
+				return
+			}
+		}
+	}))
 
 	httpNotifier := notifier.NewHTTPNotifier(cfg.Notification.ServiceURL, cfg.Notification.Token)
 	reminderWorker := worker.NewReminderWorker(repo, httpNotifier)
