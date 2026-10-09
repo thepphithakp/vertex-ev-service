@@ -5,11 +5,49 @@ import (
 	"time"
 
 	"github.com/gofiber/fiber/v2"
+	"github.com/google/uuid"
 
 	"github.com/vertex/ev-service/internal/application"
+	"github.com/vertex/ev-service/internal/domain"
 	"github.com/vertex/ev-service/internal/port"
 	"github.com/vertex/ev-service/pkg/middleware"
 )
+
+// parkingSessionResponse คือรูปแบบ JSON ที่ตอบให้ client — เดิมใช้
+// domain.ParkingSession ตรงๆ (มี json tag ติดอยู่กับ domain type เอง) ย้าย
+// มาที่นี่เพื่อไม่ให้ domain ต้องรู้จัก wire format ของ API คงชื่อ field
+// และรูปแบบเดิมทุกตัวอักษรไว้ ไม่ให้ PWA client ที่ใช้อยู่พัง
+type parkingSessionResponse struct {
+	ID             uuid.UUID  `json:"id"`
+	UserID         string     `json:"userId"`
+	Floor          string     `json:"floor"`
+	Zone           string     `json:"zone"`
+	Notes          string     `json:"notes"`
+	LocationType   string     `json:"locationType"`
+	IsDoubleParked bool       `json:"isDoubleParked"`
+	ParkedAt       time.Time  `json:"parkedAt"`
+	RemindersSent  []string   `json:"remindersSent"`
+	EndedAt        *time.Time `json:"endedAt,omitempty"`
+	CreatedAt      time.Time  `json:"createdAt"`
+	UpdatedAt      time.Time  `json:"updatedAt"`
+}
+
+func toParkingSessionResponse(s *domain.ParkingSession) parkingSessionResponse {
+	return parkingSessionResponse{
+		ID:             s.ID,
+		UserID:         s.UserID,
+		Floor:          s.Floor,
+		Zone:           s.Zone,
+		Notes:          s.Notes,
+		LocationType:   s.LocationType,
+		IsDoubleParked: s.IsDoubleParked,
+		ParkedAt:       s.ParkedAt,
+		RemindersSent:  s.RemindersSent,
+		EndedAt:        s.EndedAt,
+		CreatedAt:      s.CreatedAt,
+		UpdatedAt:      s.UpdatedAt,
+	}
+}
 
 type ParkingHandler struct {
 	useCase port.ParkingUseCase
@@ -37,7 +75,7 @@ func (h *ParkingHandler) Get(c *fiber.Ctx) error {
 	if session == nil {
 		return c.Status(fiber.StatusNoContent).Send(nil)
 	}
-	return c.JSON(session)
+	return c.JSON(toParkingSessionResponse(session))
 }
 
 type setParkingRequest struct {
@@ -80,7 +118,7 @@ func (h *ParkingHandler) Set(c *fiber.Ctx) error {
 	if err != nil {
 		return handleUseCaseError(c, err)
 	}
-	return c.JSON(session)
+	return c.JSON(toParkingSessionResponse(session))
 }
 
 func (h *ParkingHandler) Clear(c *fiber.Ctx) error {

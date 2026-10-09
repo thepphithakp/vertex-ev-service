@@ -2,7 +2,6 @@ package worker
 
 import (
 	"context"
-	"encoding/json"
 	"log/slog"
 	"time"
 
@@ -58,16 +57,8 @@ func (w *ReminderWorker) tick(ctx context.Context) {
 
 	now := w.now()
 	for _, s := range sessions {
-		var sent []string
-		if len(s.RemindersSent) > 0 {
-			if err := json.Unmarshal(s.RemindersSent, &sent); err != nil {
-				slog.ErrorContext(ctx, "reminder worker: parse reminders_sent ไม่ได้",
-					"session_id", s.ID, "error", err)
-				continue
-			}
-		}
-		sentSet := make(map[string]bool, len(sent))
-		for _, l := range sent {
+		sentSet := make(map[string]bool, len(s.RemindersSent))
+		for _, l := range s.RemindersSent {
 			sentSet[l] = true
 		}
 
